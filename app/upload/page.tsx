@@ -1,22 +1,20 @@
-"use client";
-
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "next/router";
 
-export default function Upload() {
+const UploadPage = () => {
   const [file, setFile] = useState<File | null>(null);
+  const [fileId, setFileId] = useState<string | null>(null); // Store file ID from API
   const [totalPages, setTotalPages] = useState<number | null>(null);
-  const [selectedPages, setSelectedPages] = useState<string>("");
+  const [selectedPages, setSelectedPages] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  // Handle file upload
+  // Handle file selection & upload
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       const selectedFile = event.target.files[0];
       setFile(selectedFile);
 
-      // Upload the file to the Flask API and get the total number of pages
       const formData = new FormData();
       formData.append("file", selectedFile);
 
@@ -29,6 +27,11 @@ export default function Upload() {
         const result = await response.json();
         if (response.ok) {
           setTotalPages(result.total_pages);
+
+          // Store file_id if provided by API
+          if (result.file_id) {
+            setFileId(result.file_id);
+          }
         } else {
           alert(result.error || "Failed to upload PDF");
         }
@@ -40,105 +43,103 @@ export default function Upload() {
   };
 
   // Handle page selection
-  const handlePageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSelectedPages(event.target.value);
+  const handlePageSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const page = Number(event.target.value);
+    if (event.target.checked) {
+      setSelectedPages((prev) => [...prev, page]);
+    } else {
+      setSelectedPages((prev) => prev.filter((p) => p !== page));
+    }
   };
 
   // Handle form submission
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    if (!file || !selectedPages) {
-      alert("Please upload a PDF and select pages.");
+    if (!file || selectedPages.length === 0) {
+      alert("Please upload a PDF and select at least one page.");
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // Step 1: Process the selected pages
+      // Use file_id if available, otherwise fall back to filename
+      const processBody = fileId
+        ? { file_id: fileId, pages: selectedPages }
+        : { filename: file.name, pages: selectedPages };
+
       const processResponse = await fetch("https://thecodeworks.in/canned-notes-api/process", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          filename: file.name,
-          pages: selectedPages,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(processBody),
       });
 
       const processResult = await processResponse.json();
-      console.log("Process API Response:", processResult);
-
       if (!processResponse.ok) {
         throw new Error(processResult.error || "Failed to process PDF");
       }
 
-      // Step 2: Create a Notion page
+      // Create Notion page with the processed summary
       const notionResponse = await fetch("https://thecodeworks.in/canned-notes-api/create-notion", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          markdown: processResult.summary,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ markdown: processResult.summary }),
       });
 
       const notionResult = await notionResponse.json();
-      console.log("Notion API Response:", notionResult);
-
       if (!notionResponse.ok) {
         throw new Error(notionResult.error || "Failed to create Notion page");
       }
 
-      // Redirect to the Thank You page with the Notion URL
+      // Redirect to Thank You page with Notion link
       router.push(`/thank-you?notionUrl=${encodeURIComponent(notionResult.notion_url)}`);
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        console.error("Error details:", error);
-        alert(`Error: ${error.message}`);
-      } else {
-        console.error("An unknown error occurred:", error);
-        alert("An unknown error occurred.");
-      }
+    } catch (error) {
+      console.error("Error details:", error);
+      alert(error instanceof Error ? `Error: ${error.message}` : "An unknown error occurred.");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div style={{ padding: "20px", maxWidth: "600px", margin: "0 auto" }}>
-      <h1>Upload PDF and Select Pages</h1>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label>
-            Upload PDF:
-            <input type="file" accept="application/pdf" onChange={handleFileChange} required />
-          </label>
-        </div>
+    <div className="container mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-4">Upload and Process PDF</h1>
 
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* File Upload */}
+        <input type="file" accept="application/pdf" onChange={handleFileChange} className="block" />
+
+        {/* Page Selection */}
         {totalPages && (
           <div>
-            <label>
-              Select Pages (e.g., 1, 3-5):
-              <input
-                type="text"
-                value={selectedPages}
-                onChange={handlePageChange}
-                placeholder="e.g., 1, 3-5"
-                required
-              />
-            </label>
-            <p>Total Pages: {totalPages}</p>
+            <h2 className="text-lg font-semibold">Select Pages to Process:</h2>
+            <div className="grid grid-cols-4 gap-2">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <label key={page} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    value={page}
+                    onChange={handlePageSelection}
+                  />
+                  <span>Page {page}</span>
+                </label>
+              ))}
+            </div>
           </div>
         )}
 
-        <button type="submit" disabled={isLoading}>
-          {isLoading ? "Processing..." : "Upload and Process"}
+        {/* Submit Button */}
+        <button
+          type="submit"
+          className={`px-4 py-2 bg-blue-600 text-white rounded ${isLoading ? "opacity-50" : ""}`}
+          disabled={isLoading}
+        >
+          {isLoading ? "Processing..." : "Submit"}
         </button>
       </form>
     </div>
   );
-}
+};
+
+export default UploadPage;
