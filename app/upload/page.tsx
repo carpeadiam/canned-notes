@@ -1,14 +1,14 @@
-"use client";
+"use client"; // ✅ Make it a client component
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "next/navigation"; // ✅ Correct import
 
 const UploadPage = () => {
   const [file, setFile] = useState<File | null>(null);
+  const [fileId, setFileId] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState<number | null>(null);
-  const [startPage, setStartPage] = useState<number | null>(null);
-  const [endPage, setEndPage] = useState<number | null>(null);
-  const [previewText, setPreviewText] = useState<string | null>(null);
+  const [startPage, setStartPage] = useState<number | "">("");
+  const [endPage, setEndPage] = useState<number | "">("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
@@ -29,6 +29,7 @@ const UploadPage = () => {
         const result = await response.json();
         if (response.ok) {
           setTotalPages(result.total_pages);
+          if (result.file_id) setFileId(result.file_id);
         } else {
           alert(result.error || "Failed to upload PDF");
         }
@@ -39,45 +40,23 @@ const UploadPage = () => {
     }
   };
 
-  const handlePreview = async () => {
-    if (!file || startPage === null || endPage === null || startPage < 1 || endPage > (totalPages || 0) || startPage > endPage) {
-      alert("Invalid page range. Please enter a valid start and end page.");
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const previewResponse = await fetch("https://thecodeworks.in/canned-notes-api/preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: file.name, pages: [startPage, endPage] }),
-      });
-
-      const previewResult = await previewResponse.json();
-      if (!previewResponse.ok) throw new Error(previewResult.error || "Failed to fetch preview");
-
-      setPreviewText(previewResult.text);
-    } catch (error) {
-      console.error("Preview error:", error);
-      alert(error instanceof Error ? `Error: ${error.message}` : "An unknown error occurred.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!file || startPage === null || endPage === null) {
-      alert("Please upload a PDF and select a valid page range.");
+    if (!file || !startPage || !endPage || startPage > endPage || startPage < 1 || endPage > (totalPages || 1)) {
+      alert("Please upload a valid PDF and enter a correct page range.");
       return;
     }
     setIsLoading(true);
 
     try {
+      const processBody = fileId
+        ? { file_id: fileId, pages: Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i) }
+        : { filename: file.name, pages: Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i) };
+
       const processResponse = await fetch("https://thecodeworks.in/canned-notes-api/process", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: file.name, pages: Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i) }),
+        body: JSON.stringify(processBody),
       });
 
       const processResult = await processResponse.json();
@@ -110,35 +89,27 @@ const UploadPage = () => {
 
         {totalPages && (
           <div>
-            <h2 className="text-lg font-semibold">Select Page Range:</h2>
-            <input
-              type="number"
-              placeholder="Start Page"
-              min="1"
-              max={totalPages}
-              value={startPage || ""}
-              onChange={(e) => setStartPage(Number(e.target.value))}
-              className="border p-2 mr-2"
-            />
-            <input
-              type="number"
-              placeholder="End Page"
-              min="1"
-              max={totalPages}
-              value={endPage || ""}
-              onChange={(e) => setEndPage(Number(e.target.value))}
-              className="border p-2"
-            />
-            <button type="button" onClick={handlePreview} className="ml-2 px-4 py-2 bg-gray-600 text-white rounded">
-              {isLoading ? "Loading..." : "Preview"}
-            </button>
-          </div>
-        )}
-
-        {previewText && (
-          <div className="border p-4 mt-4 bg-gray-100">
-            <h3 className="text-lg font-semibold">Preview:</h3>
-            <p className="whitespace-pre-wrap">{previewText}</p>
+            <h2 className="text-lg font-semibold">Total Pages: {totalPages}</h2>
+            <div className="flex space-x-4">
+              <input
+                type="number"
+                placeholder="Start Page"
+                value={startPage}
+                onChange={(e) => setStartPage(Number(e.target.value))}
+                min={1}
+                max={totalPages}
+                className="border p-2"
+              />
+              <input
+                type="number"
+                placeholder="End Page"
+                value={endPage}
+                onChange={(e) => setEndPage(Number(e.target.value))}
+                min={1}
+                max={totalPages}
+                className="border p-2"
+              />
+            </div>
           </div>
         )}
 
