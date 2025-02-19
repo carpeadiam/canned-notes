@@ -1,10 +1,12 @@
 "use client";
+
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function Upload() {
   const [file, setFile] = useState<File | null>(null);
   const [totalPages, setTotalPages] = useState<number | null>(null);
-  const [selectedPages, setSelectedPages] = useState<string>('');
+  const [selectedPages, setSelectedPages] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
@@ -16,11 +18,11 @@ export default function Upload() {
 
       // Upload the file to the Flask API and get the total number of pages
       const formData = new FormData();
-      formData.append('file', selectedFile);
+      formData.append("file", selectedFile);
 
       try {
-        const response = await fetch('https://thecodeworks.in/canned-notes-api/upload', {
-          method: 'POST',
+        const response = await fetch("https://thecodeworks.in/canned-notes-api/upload", {
+          method: "POST",
           body: formData,
         });
         const result = await response.json();
@@ -28,11 +30,11 @@ export default function Upload() {
         if (response.ok) {
           setTotalPages(result.total_pages);
         } else {
-          alert(result.error || 'Failed to upload PDF');
+          alert(result.error || "Failed to upload PDF");
         }
       } catch (error) {
         console.error(error);
-        alert('An error occurred while uploading the file.');
+        alert("An error occurred while uploading the file.");
       }
     }
   };
@@ -47,7 +49,7 @@ export default function Upload() {
     event.preventDefault();
 
     if (!file || !selectedPages) {
-      alert('Please upload a PDF and select pages.');
+      alert("Please upload a PDF and select pages.");
       return;
     }
 
@@ -55,10 +57,10 @@ export default function Upload() {
 
     try {
       // Step 1: Process the selected pages
-      const processResponse = await fetch('https://thecodeworks.in/canned-notes-api/process', {
-        method: 'POST',
+      const processResponse = await fetch("https://thecodeworks.in/canned-notes-api/process", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           filename: file.name,
@@ -68,14 +70,14 @@ export default function Upload() {
       const processResult = await processResponse.json();
 
       if (!processResponse.ok) {
-        throw new Error(processResult.error || 'Failed to process PDF');
+        throw new Error(processResult.error || "Failed to process PDF");
       }
 
       // Step 2: Create a Notion page
-      const notionResponse = await fetch('https://thecodeworks.in/canned-notes-api/create-notion', {
-        method: 'POST',
+      const notionResponse = await fetch("https://thecodeworks.in/canned-notes-api/create-notion", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           markdown: processResult.summary,
@@ -84,24 +86,21 @@ export default function Upload() {
       const notionResult = await notionResponse.json();
 
       if (!notionResponse.ok) {
-        throw new Error(notionResult.error || 'Failed to create Notion page');
+        throw new Error(notionResult.error || "Failed to create Notion page");
       }
 
       // Redirect to the Thank You page with the Notion URL
-      router.push({
-        pathname: '/thank-you',
-        query: { notionUrl: notionResult.notion_url },
-      });
+      router.push(`/thank-you?notionUrl=${notionResult.notion_url}`);
     } catch (error) {
       console.error(error);
-      alert('An error occurred. Please try again.');
+      alert("An error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
+    <div style={{ padding: "20px", maxWidth: "600px", margin: "0 auto" }}>
       <h1>Upload PDF and Select Pages</h1>
       <form onSubmit={handleSubmit}>
         <div>
@@ -133,7 +132,7 @@ export default function Upload() {
         )}
 
         <button type="submit" disabled={isLoading}>
-          {isLoading ? 'Processing...' : 'Upload and Process'}
+          {isLoading ? "Processing..." : "Upload and Process"}
         </button>
       </form>
     </div>
