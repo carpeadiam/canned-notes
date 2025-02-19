@@ -68,6 +68,8 @@ export default function Upload() {
         }),
       });
       const processResult = await processResponse.json();
+      console.log("Process API Response:", processResult);
+
 
       if (!processResponse.ok) {
         throw new Error(processResult.error || "Failed to process PDF");
@@ -84,6 +86,7 @@ export default function Upload() {
         }),
       });
       const notionResult = await notionResponse.json();
+      console.log("Notion API Response:", notionResult);
 
       if (!notionResponse.ok) {
         throw new Error(notionResult.error || "Failed to create Notion page");
@@ -91,10 +94,11 @@ export default function Upload() {
 
       // Redirect to the Thank You page with the Notion URL
       router.push(`/thank-you?notionUrl=${notionResult.notion_url}`);
-    } catch (error) {
-      console.error(error);
-      alert("An error occurred. Please try again.");
-    } finally {
+    } catch (error: any) {
+    console.error("Error details:", error);
+    alert(`Error: ${error.message || "Unknown error occurred"}`);
+}
+ finally {
       setIsLoading(false);
     }
   };
