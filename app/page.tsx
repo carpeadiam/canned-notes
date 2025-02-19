@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
+
 
 export default function Home() {
   const router = useRouter();
@@ -12,7 +12,10 @@ export default function Home() {
       <p className="mt-4 text-gray-600">
         Upload a PDF, select pages, and get structured notes on Notion.
       </p>
-      <Button className="mt-6" onClick={() => router.push("/upload")}>
+      <button className="mt-6 px-4 py-2 bg-blue-500 text-white rounded" onClick={() => router.push("/upload")}>
+  Get Started
+</button>
+
         Get Started
       </Button>
     </main>
