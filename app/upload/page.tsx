@@ -3,56 +3,66 @@ import { useRouter } from 'next/router';
 
 export default function Upload() {
   const [file, setFile] = useState<File | null>(null);
-  const [pages, setPages] = useState<number[]>([]);
+  const [totalPages, setTotalPages] = useState<number | null>(null);
+  const [selectedPages, setSelectedPages] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle file upload
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
-      setFile(event.target.files[0]);
+      const selectedFile = event.target.files[0];
+      setFile(selectedFile);
+
+      // Upload the file to the Flask API and get the total number of pages
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      try {
+        const response = await fetch('https://thecodeworks.in/canned-notes-api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        const result = await response.json();
+
+        if (response.ok) {
+          setTotalPages(result.total_pages);
+        } else {
+          alert(result.error || 'Failed to upload PDF');
+        }
+      } catch (error) {
+        console.error(error);
+        alert('An error occurred while uploading the file.');
+      }
     }
   };
 
-  const handlePageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedPages = Array.from(event.target.selectedOptions, (option) =>
-      parseInt(option.value)
-    );
-    setPages(selectedPages);
+  // Handle page selection
+  const handlePageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedPages(event.target.value);
   };
 
+  // Handle form submission
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!file || pages.length === 0) {
-      alert('Please upload a PDF and select at least one page.');
+
+    if (!file || !selectedPages) {
+      alert('Please upload a PDF and select pages.');
       return;
     }
 
     setIsLoading(true);
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
-      // Step 1: Upload the PDF
-      const uploadResponse = await fetch('http://localhost:5000/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      const uploadResult = await uploadResponse.json();
-
-      if (!uploadResponse.ok) {
-        throw new Error(uploadResult.error || 'Failed to upload PDF');
-      }
-
-      // Step 2: Process the selected pages
-      const processResponse = await fetch('http://localhost:5000/process', {
+      // Step 1: Process the selected pages
+      const processResponse = await fetch('https://thecodeworks.in/canned-notes-api/process', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          filepath: uploadResult.filepath,
-          pages: pages,
+          filename: file.name,
+          pages: selectedPages,
         }),
       });
       const processResult = await processResponse.json();
@@ -61,10 +71,26 @@ export default function Upload() {
         throw new Error(processResult.error || 'Failed to process PDF');
       }
 
+      // Step 2: Create a Notion page
+      const notionResponse = await fetch('https://thecodeworks.in/canned-notes-api/create-notion', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          markdown: processResult.summary,
+        }),
+      });
+      const notionResult = await notionResponse.json();
+
+      if (!notionResponse.ok) {
+        throw new Error(notionResult.error || 'Failed to create Notion page');
+      }
+
       // Redirect to the Thank You page with the Notion URL
       router.push({
         pathname: '/thank-you',
-        query: { notionUrl: processResult.notion_page_url },
+        query: { notionUrl: notionResult.notion_url },
       });
     } catch (error) {
       console.error(error);
@@ -89,18 +115,23 @@ export default function Upload() {
             />
           </label>
         </div>
-        <div>
-          <label>
-            Select Pages:
-            <select multiple onChange={handlePageChange} required>
-              {Array.from({ length: 10 }, (_, i) => (
-                <option key={i + 1} value={i}>
-                  Page {i + 1}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+
+        {totalPages && (
+          <div>
+            <label>
+              Select Pages (e.g., 1, 3-5):
+              <input
+                type="text"
+                value={selectedPages}
+                onChange={handlePageChange}
+                placeholder="e.g., 1, 3-5"
+                required
+              />
+            </label>
+            <p>Total Pages: {totalPages}</p>
+          </div>
+        )}
+
         <button type="submit" disabled={isLoading}>
           {isLoading ? 'Processing...' : 'Upload and Process'}
         </button>
