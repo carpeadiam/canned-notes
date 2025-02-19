@@ -16,8 +16,6 @@ export default function Home() {
   Get Started
 </button>
 
-        Get Started
-      </Button>
     </main>
   );
 }
