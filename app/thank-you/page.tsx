@@ -1,9 +1,10 @@
 "use client";
-import { useRouter } from "next/navigation";
+
+import { useSearchParams } from "next/navigation";
 
 export default function ThankYou() {
-  const router = useRouter();
-  const { notionUrl } = router.query;
+  const searchParams = useSearchParams();
+  const notionUrl = searchParams.get("notionUrl");
 
   return (
     <div style={{ padding: '20px', textAlign: 'center' }}>
@@ -11,7 +12,7 @@ export default function ThankYou() {
       <p>Your Notion page has been created successfully.</p>
       {notionUrl && (
         <a
-          href={notionUrl as string}
+          href={notionUrl}
           target="_blank"
           rel="noopener noreferrer"
           style={{ color: 'blue', textDecoration: 'underline' }}
