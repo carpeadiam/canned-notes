@@ -25,15 +25,15 @@ export default function Upload() {
           method: "POST",
           body: formData,
         });
-        const result = await response.json();
 
+        const result = await response.json();
         if (response.ok) {
           setTotalPages(result.total_pages);
         } else {
           alert(result.error || "Failed to upload PDF");
         }
       } catch (error) {
-        console.error(error);
+        console.error("File upload error:", error);
         alert("An error occurred while uploading the file.");
       }
     }
@@ -67,9 +67,9 @@ export default function Upload() {
           pages: selectedPages,
         }),
       });
+
       const processResult = await processResponse.json();
       console.log("Process API Response:", processResult);
-
 
       if (!processResponse.ok) {
         throw new Error(processResult.error || "Failed to process PDF");
@@ -85,6 +85,7 @@ export default function Upload() {
           markdown: processResult.summary,
         }),
       });
+
       const notionResult = await notionResponse.json();
       console.log("Notion API Response:", notionResult);
 
@@ -93,12 +94,16 @@ export default function Upload() {
       }
 
       // Redirect to the Thank You page with the Notion URL
-      router.push(`/thank-you?notionUrl=${notionResult.notion_url}`);
-    } catch (error: any) {
-    console.error("Error details:", error);
-    alert(`Error: ${error.message || "Unknown error occurred"}`);
-}
- finally {
+      router.push(`/thank-you?notionUrl=${encodeURIComponent(notionResult.notion_url)}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error("Error details:", error);
+        alert(`Error: ${error.message}`);
+      } else {
+        console.error("An unknown error occurred:", error);
+        alert("An unknown error occurred.");
+      }
+    } finally {
       setIsLoading(false);
     }
   };
@@ -110,12 +115,7 @@ export default function Upload() {
         <div>
           <label>
             Upload PDF:
-            <input
-              type="file"
-              accept="application/pdf"
-              onChange={handleFileChange}
-              required
-            />
+            <input type="file" accept="application/pdf" onChange={handleFileChange} required />
           </label>
         </div>
 
